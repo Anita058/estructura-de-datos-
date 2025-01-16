@@ -1,0 +1,326 @@
+from google.colab import drive
+drive.mount('/content/drive')
+
+!ls /content/drive/MyDrive/estructura\ de\ datos
+
+
+
+from datetime import datetime
+
+# Definición de las clases
+
+class Usuario:
+    def __init__(self, cedula, nombre, fecha_nacimiento, ciudad_nacimiento, telefono, correo, direccion):
+        self.cedula = cedula
+        self.nombre = nombre
+        self.fecha_nacimiento = fecha_nacimiento
+        self.ciudad_nacimiento = ciudad_nacimiento
+        self.telefono = telefono
+        self.correo = correo
+        self.direccion = direccion
+
+class Empleado(Usuario):
+    def __init__(self, cedula, nombre, fecha_nacimiento, ciudad_nacimiento, telefono, correo, direccion, password, rol):
+        super().__init__(cedula, nombre, fecha_nacimiento, ciudad_nacimiento, telefono, correo, direccion)
+        self.password = password
+        self.rol = rol
+
+    def login(self, password):
+        return self.password == password
+
+class Equipo:
+    def __init__(self, nombre, placa, fecha_compra, valor_compra, empleado):
+        self.nombre = nombre
+        self.placa = placa
+        self.fecha_compra = fecha_compra
+        self.valor_compra = valor_compra
+        self.empleado = empleado
+
+class Solicitud:
+    def __init__(self, tipo, descripcion, equipo=None, placa=None):
+        self.tipo = tipo
+        self.descripcion = descripcion
+        self.equipo = equipo
+        self.placa = placa
+        self.estado = "Pendiente"
+
+class Inventario:
+    def __init__(self):
+        self.equipos = []
+
+    def agregar_equipo(self, equipo):
+        self.equipos.append(equipo)
+
+    def eliminar_equipo(self, placa):
+        self.equipos = [equipo for equipo in self.equipos if equipo.placa != placa]
+
+class ControlCambios:
+    def __init__(self):
+        self.cambios = []
+
+    def registrar_cambio(self, investigador, placa, tipo_cambio):
+        fecha_hora = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        self.cambios.append({
+            'investigador': investigador,
+            'placa': placa,
+            'tipo_cambio': tipo_cambio,
+            'fecha_hora': fecha_hora
+        })
+
+class Serializador:
+    separador = ';'
+
+    @staticmethod
+    def cargar_desde_archivo(nombre_archivo, clase_objeto):
+        datos = []
+        try:
+            with open(nombre_archivo, 'r') as archivo:
+                for linea in archivo:
+                    atributos = linea.strip().split(Serializador.separador)
+                    objeto = clase_objeto(*atributos)
+                    datos.append(objeto)
+        except FileNotFoundError:
+            print(f"Archivo no encontrado: {nombre_archivo}")
+        except Exception as e:
+            print(f"Error al cargar el archivo {nombre_archivo}: {e}")
+        return datos
+
+    @staticmethod
+    def guardar_en_archivo(nombre_archivo, lista_objetos, get_atributos):
+        try:
+            with open(nombre_archivo, 'w') as archivo:
+                for objeto in lista_objetos:
+                    atributos = get_atributos(objeto)
+                    linea = Serializador.separador.join(atributos)
+                    archivo.write(linea + '\n')
+        except Exception as e:
+            print(f"Error al guardar en el archivo {nombre_archivo}: {e}")
+
+class App:
+    def __init__(self):
+        self.usuario = None
+        self.empleados = []
+        self.inventario = Inventario()
+        self.control_cambios = ControlCambios()
+        self.solicitudes = []
+
+    def cargar_usuarios(self):
+        ruta_empleados = '/content/drive/MyDrive/estructura de datos/Empleados.txt'
+        self.empleados = Serializador.cargar_desde_archivo(ruta_empleados, Empleado)
+
+    def guardar_usuarios(self):
+        ruta_empleados = '/content/drive/MyDrive/estructura de datos/Empleados.txt'
+        Serializador.guardar_en_archivo(ruta_empleados, self.empleados, lambda x: [x.cedula, x.nombre, x.fecha_nacimiento, x.ciudad_nacimiento, x.telefono, x.correo, x.direccion, x.password, x.rol])
+
+    def guardar_control_cambios(self, solicitud):
+        ruta_cambios = '/content/drive/MyDrive/estructura de datos/Control_de_cambios.txt'
+        self.control_cambios.registrar_cambio(self.usuario.cedula, solicitud.equipo.placa if solicitud.equipo else solicitud.placa, solicitud.tipo)
+        Serializador.guardar_en_archivo(ruta_cambios, self.control_cambios.cambios, lambda x: [x['investigador'], x['placa'], x['tipo_cambio'], x['fecha_hora']])
+
+    def menu_investigador(self):
+        while True:
+            print("\nMenú Investigador")
+            print("1. Consultar inventario")
+            print("2. Realizar solicitud (Agregar/Eliminar equipo)")
+            print("3. Consultar estado de solicitudes")
+            print("4. Generar archivo de inventario")
+            print("5. Salir")
+            opcion = input("Seleccione una opción: ")
+
+            if opcion == "1":
+                self.consultar_inventario()
+            elif opcion == "2":
+                self.realizar_solicitud()
+            elif opcion == "3":
+                self.consultar_estado_solicitudes()
+            elif opcion == "4":
+                self.generar_archivo_inventario()
+            elif opcion == "5":
+                print("Saliendo...")
+                break
+            else:
+                print("Opción inválida, intente de nuevo.")
+
+    def menu_administrador(self):
+        while True:
+            print("\nMenú Administrador")
+            print("1. Consultar inventario personal")
+            print("2. Consultar inventario general")
+            print("3. Gestionar usuarios")
+            print("4. Aprobar/rechazar solicitudes")
+            print("5. Generar archivos (inventarios, control de cambios, solicitudes)")
+            print("6. Salir")
+            opcion = input("Seleccione una opción: ")
+
+            if opcion == "1":
+                self.consultar_inventario()
+            elif opcion == "2":
+                self.consultar_inventario_general()
+            elif opcion == "3":
+                self.gestionar_usuarios()
+            elif opcion == "4":
+                self.aprobar_rechazar_solicitudes()
+            elif opcion == "5":
+                self.generar_archivos_administrador()
+            elif opcion == "6":
+                print("Saliendo...")
+                break
+            else:
+                print("Opción inválida, intente de nuevo.")
+
+    def realizar_solicitud(self):
+        print("\nRealizar Solicitud")
+        print("1. Solicitud para agregar equipo")
+        print("2. Solicitud para eliminar equipo")
+        opcion = input("Seleccione una opción: ")
+
+        if opcion == "1":
+            nombre = input("Nombre del equipo: ")
+            placa = input("Número de placa (8 dígitos): ")
+            fecha_compra = input("Fecha de compra (YYYY-MM-DD): ")
+            valor_compra = input("Valor de compra: ")
+            descripcion = input("Justificación: ")
+
+            equipo = Equipo(nombre, placa, fecha_compra, valor_compra, self.usuario)
+            solicitud = Solicitud("Agregar", descripcion, equipo=equipo)
+            self.solicitudes.append(solicitud)
+            print("Solicitud de agregar equipo realizada.")
+
+        elif opcion == "2":
+            placa = input("Número de placa del equipo: ")
+            descripcion = input("Justificación: ")
+
+            solicitud = Solicitud("Eliminar", descripcion, placa=placa)
+            self.solicitudes.append(solicitud)
+            print("Solicitud de eliminar equipo realizada.")
+
+        else:
+            print("Opción inválida.")
+
+    def consultar_estado_solicitudes(self):
+        print("\nEstado de Solicitudes")
+        for solicitud in self.solicitudes:
+            if solicitud.equipo and solicitud.equipo.empleado == self.usuario:
+                print(f"Tipo: {solicitud.tipo}, Estado: {solicitud.estado}, Equipo: {solicitud.equipo.nombre}")
+            elif solicitud.placa:
+                print(f"Tipo: {solicitud.tipo}, Estado: {solicitud.estado}, Placa: {solicitud.placa}")
+
+    def generar_archivo_inventario(self):
+        inventario_usuario = [equipo for equipo in self.inventario.equipos if equipo.empleado == self.usuario]
+        ruta_archivo = f"/content/drive/MyDrive/estructura de datos/Inventario_{self.usuario.cedula}.txt"
+        Serializador.guardar_en_archivo(ruta_archivo, inventario_usuario, lambda x: [x.nombre, x.placa, x.fecha_compra, x.valor_compra])
+        print(f"Archivo generado: {ruta_archivo}")
+
+    def consultar_inventario_general(self):
+        inventario_ordenado = sorted(self.inventario.equipos, key=lambda x: x.placa)
+        ruta_archivo = "/content/drive/MyDrive/estructura de datos/InventarioGeneral.txt"
+        Serializador.guardar_en_archivo(ruta_archivo, inventario_ordenado, lambda x: [x.nombre, x.placa, x.fecha_compra, x.valor_compra, x.empleado.nombre])
+        print(f"Inventario general guardado en: {ruta_archivo}")
+
+    def ordenar_inventario(self):
+        for i in range(len(self.inventario.equipos)):
+            for j in range(len(self.inventario.equipos) - i - 1):
+                if self.inventario.equipos[j].placa > self.inventario.equipos[j + 1].placa:
+                    self.inventario.equipos[j], self.inventario.equipos[j + 1] = self.inventario.equipos[j + 1], self.inventario.equipos[j]
+
+    def gestionar_usuarios(self):
+        print("\nGestión de Usuarios")
+        print("1. Crear nuevo usuario")
+        print("2. Eliminar usuario")
+        print("3. Cambiar contraseña de usuario")
+        opcion = input("Seleccione una opción: ")
+
+        if opcion == "1":
+            self.crear_usuario()
+        elif opcion == "2":
+            self.eliminar_usuario()
+        elif opcion == "3":
+            self.cambiar_contrasena()
+        else:
+            print("Opción inválida.")
+
+    def crear_usuario(self):
+        cedula = input("Cédula: ")
+        nombre = input("Nombre: ")
+        fecha_nacimiento = input("Fecha de nacimiento (YYYY-MM-DD): ")
+        ciudad_nacimiento = input("Ciudad de nacimiento: ")
+        telefono = input("Teléfono: ")
+        correo = input("Correo electrónico: ")
+        direccion = input("Dirección: ")
+        password = input("Contraseña: ")
+        rol = input("Rol (Administrador/Investigador): ")
+
+        nuevo_usuario = Empleado(cedula, nombre, fecha_nacimiento, ciudad_nacimiento, telefono, correo, direccion, password, rol)
+        self.empleados.append(nuevo_usuario)
+        self.guardar_usuarios()
+        print("Usuario creado exitosamente.")
+
+    def eliminar_usuario(self):
+        cedula = input("Ingrese la cédula del usuario a eliminar: ")
+        self.empleados = [emp for emp in self.empleados if emp.cedula != cedula]
+        self.guardar_usuarios()
+        print("Usuario eliminado exitosamente.")
+
+    def cambiar_contrasena(self):
+        cedula = input("Ingrese la cédula del usuario: ")
+        nueva_contrasena = input("Nueva contraseña: ")
+        for emp in self.empleados:
+            if emp.cedula == cedula:
+                emp.password = nueva_contrasena
+                print("Contraseña cambiada exitosamente.")
+        self.guardar_usuarios()
+
+    def aprobar_rechazar_solicitudes(self):
+        print("\nGestión de Solicitudes")
+        for i, solicitud in enumerate(self.solicitudes):
+            print(f"{i + 1}. Tipo: {solicitud.tipo}, Estado: {solicitud.estado}, Descripción: {solicitud.descripcion}")
+        indice = int(input("Seleccione el número de solicitud a gestionar: ")) - 1
+        if 0 <= indice < len(self.solicitudes):
+            solicitud = self.solicitudes[indice]
+            if solicitud.tipo == "Agregar":
+                decision = input("¿Aprobar solicitud? (s/n): ")
+                if decision.lower() == 's':
+                    self.inventario.agregar_equipo(solicitud.equipo)
+                    solicitud.estado = "Aceptada"
+                    print("Solicitud aceptada.")
+                else:
+                    solicitud.estado = "Rechazada"
+                    print("Solicitud rechazada.")
+            elif solicitud.tipo == "Eliminar":
+                decision = input("¿Aprobar solicitud? (s/n): ")
+                if decision.lower() == 's':
+                    self.inventario.eliminar_equipo(solicitud.placa)
+                    solicitud.estado = "Aceptada"
+                    print("Solicitud aceptada.")
+                else:
+                    solicitud.estado = "Rechazada"
+                    print("Solicitud rechazada.")
+            self.guardar_control_cambios(solicitud)
+        else:
+            print("Opción inválida.")
+
+    def main(self):
+        self.cargar_usuarios()  # Cargar usuarios desde el archivo
+        print("Bienvenido al sistema de inventario.")
+
+        while True:
+            print("\nInicio de Sesión")
+            cedula = input("Cédula: ")
+            password = input("Contraseña: ")
+
+            # Verificar credenciales
+            for empleado in self.empleados:
+                if empleado.cedula == cedula and empleado.login(password):
+                    self.usuario = empleado
+                    print(f"Bienvenido, {empleado.nombre} ({empleado.rol}).")
+                    if empleado.rol == "Administrador":
+                        self.menu_administrador()
+                    elif empleado.rol == "Investigador":
+                        self.menu_investigador()
+                    return
+            print("Usuario o contraseña incorrectos. Intente de nuevo.")
+
+# Ejecutar el programa
+if __name__ == "__main__":
+    app = App()
+    app.main()
